@@ -1,0 +1,116 @@
+= MQ
+:source-highlighter: pygments
+:toc:
+
+== Infrastructure Overview
+
+This is a MQ cluster, that contains the following queue managers:
+
+* cqm1 -> Full Repo
+* cqm2 -> Full Repo
+* cqm3 -> Partial Repo
+* cqm4 -> Partial Repo
+* cqm5 -> Partial Repo
+
+The MQ cluster is called `MQCLUS`
+
+image::readme-images/Screenshot 2020-12-24 at 09.29.59.png[]
+
+Each queue manager is connected to a local OpenLDAP
+
+All connections are encrypted using SSL
+
+== Deployment steps
+
+. Login
++
+First login to openshift
++
+Then login to docker:
++
+[source, bash]
+----
+$ docker_registry_hostname=$(oc get routes -n openshift-image-registry -o=jsonpath='{.items[0].spec.host}')
+
+$ docker login $docker_registry_hostname -u oc -p $(oc whoami -t)
+----
+
+. Build the images
++
+
+[source, bash]
+----
+$ docker build -t $docker_registry_hostname/mq/mq-cluster-qm1:v1-amd64 ./cmq1/image
+$ docker build -t $docker_registry_hostname/mq/mq-cluster-qm2:v1-amd64 ./cmq2/image
+$ docker build -t $docker_registry_hostname/mq/mq-cluster-qm3:v1-amd64 ./cmq3/image
+$ docker build -t $docker_registry_hostname/mq/mq-cluster-qm4:v1-amd64 ./cmq4/image
+$ docker build -t $docker_registry_hostname/mq/mq-cluster-qm5:v1-amd64 ./cmq5/image
+----
+
+. Push the images
++
+[source, bash]
+----
+$ docker push $docker_registry_hostname/mq/mq-cluster-qm1:v1-amd64
+$ docker push $docker_registry_hostname/mq/mq-cluster-qm2:v1-amd64
+$ docker push $docker_registry_hostname/mq/mq-cluster-qm3:v1-amd64
+$ docker push $docker_registry_hostname/mq/mq-cluster-qm4:v1-amd64
+$ docker push $docker_registry_hostname/mq/mq-cluster-qm5:v1-amd64
+----
+
+. Create a secret to hold the certs
++
+Edit ./mq-cert-secret.yaml with your cert and key
++
+[source, bash]
+----
+oc apply -f mq-cert-secret.yaml
+----
+
+. Create the MQ instances
++
+[source, bash]
+----
+$ oc apply -f cqm1/cqm1.yaml
+$ oc apply -f cqm2/cqm2.yaml
+$ oc apply -f cqm3/cqm3.yaml
+$ oc apply -f cqm4/cqm4.yaml
+$ oc apply -f cqm5/cqm5.yaml
+----
+
+
+== Useful Commands
+
+* To check that the cluster has been set up correctly, start `runmqsc` in any of the MQ pods.
++
+[source, bash]
+----
+$ DIS CLUSQMGR(*) QMTYPE
+----
++
+This should return a similar output:
++
+[source, bash]
+----
+AMQ8441I: Display Cluster Queue Manager details.
+   CLUSQMGR(QM1)                           CHANNEL(MQCLUS.CQM1)
+   CLUSTER(MQCLUS)                         QMTYPE(REPOS)
+AMQ8441I: Display Cluster Queue Manager details.
+   CLUSQMGR(QM2)                           CHANNEL(MQCLUS.CQM2)
+   CLUSTER(MQCLUS)                         QMTYPE(REPOS)
+AMQ8441I: Display Cluster Queue Manager details.
+   CLUSQMGR(QM3)                           CHANNEL(MQCLUS.CQM3)
+   CLUSTER(MQCLUS)                         QMTYPE(NORMAL)
+AMQ8441I: Display Cluster Queue Manager details.
+   CLUSQMGR(QM4)                           CHANNEL(MQCLUS.CQM4)
+   CLUSTER(MQCLUS)                         QMTYPE(NORMAL)
+AMQ8441I: Display Cluster Queue Manager details.
+   CLUSQMGR(QM5)                           CHANNEL(MQCLUS.CQM5)
+   CLUSTER(MQCLUS)                         QMTYPE(NORMAL)
+
+DIS CLUSQMGR(*) QMTYPE
+----
++
+QMTYPE(REPOS) -> This is displayed for any full repos
+QMTYPE(NORMAL) -> This is displayed for any partial repos
+

@@ -1,0 +1,13 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: cqm5-ibm-mq-dev-app-svrconn
+spec:
+  host: dev2e-app2e-svrconn.chl.mq.ibm.com
+  to:
+    kind: Service
+    name: cqm5-ibm-mq
+  port:
+    targetPort: 1414
+  tls:
+    termination: passthrough
